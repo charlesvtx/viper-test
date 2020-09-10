@@ -21,7 +21,10 @@ package viper
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,6 +51,8 @@ import (
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
 )
+
+var encryptionKey = "dbc93df0ecad45d7ec70e3d6b4495363358c351ff4eb3eab1eb2fd5e7292c50f"
 
 // ConfigMarshalError happens when failing to marshal the configuration.
 type ConfigMarshalError struct {
@@ -723,6 +728,64 @@ func GetViper() *Viper {
 //
 // Get returns an interface. For a specific value use one of the Get____ methods.
 func Get(key string) interface{} { return v.Get(key) }
+
+func GetConfig(key string) string {
+	return CheckEncryption(v.Get(key))
+}
+
+func CheckEncryption(encryption interface{}) string {
+	if reflect.TypeOf(encryption).Kind() == reflect.Map {
+
+		configMap := encryption.(map[string]interface{})
+
+		if configMap["encrypted"].(bool) {
+			decryption, err := DecryptString(configMap["encryption"].(string), encryptionKey)
+
+			if err != nil {
+				panic(err.Error())
+			}
+
+			return decryption
+		} else {
+			return ""
+		}
+	}
+
+	return encryption.(string)
+}
+
+func DecryptString(encryptedString string, keyString string) (string, error) {
+
+	key, _ := hex.DecodeString(keyString)
+	enc, _ := hex.DecodeString(encryptedString)
+
+	//Create a new Cipher Block from the key
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//Create a new GCM
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//Get the nonce size
+	nonceSize := aesGCM.NonceSize()
+
+	//Extract the nonce from the encrypted data
+	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+
+	//Decrypt the data
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return fmt.Sprintf("%s", plaintext), nil
+}
+
 func (v *Viper) Get(key string) interface{} {
 	lcaseKey := strings.ToLower(key)
 	val := v.find(lcaseKey, true)
