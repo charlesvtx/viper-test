@@ -52,8 +52,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var encryptionKey = "dbc93df0ecad45d7ec70e3d6b4495363358c351ff4eb3eab1eb2fd5e7292c50f"
-
 // ConfigMarshalError happens when failing to marshal the configuration.
 type ConfigMarshalError struct {
 	err error
@@ -220,6 +218,8 @@ type Viper struct {
 
 	onConfigChange func(fsnotify.Event)
 }
+
+var encryptionKey string
 
 // New returns an initialized Viper instance.
 func New() *Viper {
@@ -729,11 +729,17 @@ func GetViper() *Viper {
 // Get returns an interface. For a specific value use one of the Get____ methods.
 func Get(key string) interface{} { return v.Get(key) }
 
+//TODO: allow not string values
 func GetConfig(key string) string {
 	return CheckEncryption(v.Get(key))
 }
 
 func CheckEncryption(encryption interface{}) string {
+
+	if encryptionKey == "" {
+		panic("Encryption key is not set")
+	}
+
 	if reflect.TypeOf(encryption).Kind() == reflect.Map {
 
 		configMap := encryption.(map[string]interface{})
@@ -1978,6 +1984,15 @@ func (v *Viper) AllSettings() map[string]interface{} {
 		deepestMap[lastKey] = value
 	}
 	return m
+}
+
+// SetEncryptionKey sets name for the config file.
+// Does not include extension.
+func SetEncryptionKey(in string) { v.SetEncryptionKey(in) }
+func (v *Viper) SetEncryptionKey(in string) {
+	if in != "" {
+		encryptionKey = in
+	}
 }
 
 // SetFs sets the filesystem to use to read configuration.
