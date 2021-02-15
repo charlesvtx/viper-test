@@ -21,7 +21,10 @@ package viper
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,8 +38,6 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	//"github.com/hashicorp/hcl"
-	//"github.com/hashicorp/hcl/hcl/printer"
 	"github.com/magiconair/properties"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pelletier/go-toml"
@@ -215,6 +216,8 @@ type Viper struct {
 
 	onConfigChange func(fsnotify.Event)
 }
+
+var encryptionKey string
 
 // New returns an initialized Viper instance.
 func New() *Viper {
@@ -723,6 +726,70 @@ func GetViper() *Viper {
 //
 // Get returns an interface. For a specific value use one of the Get____ methods.
 func Get(key string) interface{} { return v.Get(key) }
+
+//TODO: allow not string values
+func GetConfig(key string) string {
+	return CheckEncryption(v.Get(key))
+}
+
+func CheckEncryption(encryption interface{}) string {
+
+	if encryptionKey == "" {
+		panic("Encryption key is not set")
+	}
+
+	if reflect.TypeOf(encryption).Kind() == reflect.Map {
+
+		configMap := encryption.(map[string]interface{})
+
+		if configMap["encrypted"].(bool) {
+			decryption, err := DecryptString(configMap["encryption"].(string), encryptionKey)
+
+			if err != nil {
+				panic(err.Error())
+			}
+
+			return decryption
+		} else {
+			return ""
+		}
+	}
+
+	return encryption.(string)
+}
+
+func DecryptString(encryptedString string, keyString string) (string, error) {
+
+	key, _ := hex.DecodeString(keyString)
+	enc, _ := hex.DecodeString(encryptedString)
+
+	//Create a new Cipher Block from the key
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//Create a new GCM
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//Get the nonce size
+	nonceSize := aesGCM.NonceSize()
+
+	//Extract the nonce from the encrypted data
+	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+
+	//Decrypt the data
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return fmt.Sprintf("%s", plaintext), nil
+}
+
 func (v *Viper) Get(key string) interface{} {
 	lcaseKey := strings.ToLower(key)
 	val := v.find(lcaseKey, true)
@@ -1915,6 +1982,15 @@ func (v *Viper) AllSettings() map[string]interface{} {
 		deepestMap[lastKey] = value
 	}
 	return m
+}
+
+// SetEncryptionKey sets name for the config file.
+// Does not include extension.
+func SetEncryptionKey(in string) { v.SetEncryptionKey(in) }
+func (v *Viper) SetEncryptionKey(in string) {
+	if in != "" {
+		encryptionKey = in
+	}
 }
 
 // SetFs sets the filesystem to use to read configuration.
