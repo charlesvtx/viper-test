@@ -40,7 +40,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/magiconair/properties"
 	"github.com/mitchellh/mapstructure"
-	"github.com/pelletier/go-toml"
 	"github.com/spf13/afero"
 	"github.com/spf13/cast"
 	jww "github.com/spf13/jwalterweatherman"
@@ -1554,15 +1553,15 @@ func (v *Viper) unmarshalReader(in io.Reader, c map[string]interface{}) error {
 	// 		return ConfigParseError{err}
 	// 	}
 
-	case "toml":
-		tree, err := toml.LoadReader(buf)
-		if err != nil {
-			return ConfigParseError{err}
-		}
-		tmap := tree.ToMap()
-		for k, v := range tmap {
-			c[k] = v
-		}
+	// case "toml":
+	// 	tree, err := toml.LoadReader(buf)
+	// 	if err != nil {
+	// 		return ConfigParseError{err}
+	// 	}
+	// 	tmap := tree.ToMap()
+	// 	for k, v := range tmap {
+	// 		c[k] = v
+	// 	}
 
 	case "dotenv", "env":
 		env, err := gotenv.StrictParse(buf)
@@ -1667,15 +1666,15 @@ func (v *Viper) marshalWriter(f afero.File, configType string) error {
 			return ConfigMarshalError{err}
 		}
 
-	case "toml":
-		t, err := toml.TreeFromMap(c)
-		if err != nil {
-			return ConfigMarshalError{err}
-		}
-		s := t.String()
-		if _, err := f.WriteString(s); err != nil {
-			return ConfigMarshalError{err}
-		}
+	// case "toml":
+	// 	t, err := toml.TreeFromMap(c)
+	// 	if err != nil {
+	// 		return ConfigMarshalError{err}
+	// 	}
+	// 	s := t.String()
+	// 	if _, err := f.WriteString(s); err != nil {
+	// 		return ConfigMarshalError{err}
+	// 	}
 
 	case "yaml", "yml":
 		b, err := yaml.Marshal(c)
